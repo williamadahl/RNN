@@ -17,3 +17,6 @@ mov DWORD PTR -4[rbp], edi
 
 ***Exstra token***
 Might have to add a token to represent the start and end of a new binary 
+
+***Use threshold***
+Maybe see if model can predict at a certain threshold. This way we don't have to feed all code per sample, but terminate at predction. 
