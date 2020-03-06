@@ -14,3 +14,6 @@ Since we are feeding line by line into the NN, it might be best to just use the 
 ``` 
 mov DWORD PTR -4[rbp], edi
 ```
+
+***Exstra token***
+Might have to add a token to represent the start and end of a new binary 
