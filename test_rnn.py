@@ -10,14 +10,14 @@ import numpy as np
 print(torch.__version__)
 
 # Read in all training and testing data 
-# f = open('../VulnerabilityGenerator/FinalizedData/Train.txt','r')
-f = open('../../Master/FinalizedData/Train.txt', 'r')
+f = open('../VulnerabilityGenerator/FinalizedData/Train.txt','r')
+# f = open('../../Master/FinalizedData/Train.txt', 'r')
 if f.mode == 'r':
     train_file = f.readlines()
     f.close()
 
-# f = open('../VulnerabilityGenerator/FinalizedData/Test.txt','r')
-f = open('../../Master/FinalizedData/Test.txt', 'r')
+f = open('../VulnerabilityGenerator/FinalizedData/Test.txt','r')
+# f = open('../../Master/FinalizedData/Test.txt', 'r')
 if f.mode == 'r':
     test_file = f.readlines()
     f.close()
@@ -29,11 +29,11 @@ main_indexes_train = [] # list to store the main: indexes, aka each new data sam
 for i in range(len(train_file)):
     if train_file[i].startswith('__label0__'):
         train_labels.append(0)
-        train_file[i] = 'main:\n'
+        train_file[i] = 'main :\n'
         main_indexes_train.append(i)
     elif train_file[i].startswith('__label1__'):
         train_labels.append(1)
-        train_file[i] = 'main:\n'
+        train_file[i] = 'main :\n'
         main_indexes_train.append(i)
 
 print(main_indexes_train)
@@ -45,11 +45,11 @@ main_indexes_test = [] # list to store the main: indexes, aka each new data samp
 for i in range(len(test_file)):
     if test_file[i].startswith('__label0__'):
         test_labels.append(0)
-        test_file[i] = 'main:\n'
+        test_file[i] = 'main :\n'
         main_indexes_test.append(i)
     elif test_file[i].startswith('__label1__'):
         test_labels.append(1)
-        test_file[i] = 'main:\n'
+        test_file[i] = 'main :\n'
         main_indexes_test.append(i)
 
 print(main_indexes_test)
@@ -123,13 +123,37 @@ for x in range(len(test_data)):
     test_data[x] = test_sample
 
 
-for i in range(len(test_data)):
-    print(len(test_data[i]))
-
-
 del test_file, train_file
 
-print(test_data)
+print('this is training data\n', training_data[0])
+# print('this is test data\n' ,test_data)
+
+# Sorting the words according to the number of appearances, with the most common word being first
+words = sorted(words, key=words.get, reverse=True)
+words = ['_PAD','_UNK'] + words
+word2idx = {o:i for i,o in enumerate(words)}
+idx2word = {i:o for i,o in enumerate(words)}
+
+# With mapping, convert words in a sample into their corresponding indexes
+# 
+
+# for i in range(len(training_data)):
+    # for j in range(len(training_data[i])):
+        # for k, sentence in enumerate(training_data[i][j]):
+            # training_data[i][j][k] = [word2idx[word] if word in word2idx else 1 for word in sentence]
+        # Looking up the mapping dictionary and assigning the index to the respective words
+for i in range(len(training_data)):
+    for j, sentence in enumerate(training_data[i]):
+        # Looking up the mapping dictionary and assigning the index to the respective words
+        training_data[i][j] = [word2idx[word] if word in word2idx else 999 for word in sentence]
+
+# problem is that: 'main:' needs to be split into ['main', ':']
+# next is that all 'rbp,' needs to be split into ['rpb', ',']
+
+print('this is training data\n', training_data[0])
+print(word2idx)
+
+
 print(train_labels)
 print(test_labels)
 
