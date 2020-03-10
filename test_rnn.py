@@ -125,8 +125,7 @@ for x in range(len(test_data)):
 
 del test_file, train_file
 
-print('this is training data\n', training_data[0])
-# print('this is test data\n' ,test_data)
+print('this is training data\n', test_data[0])
 
 # Sorting the words according to the number of appearances, with the most common word being first
 words = sorted(words, key=words.get, reverse=True)
@@ -134,26 +133,57 @@ words = ['_PAD','_UNK'] + words
 word2idx = {o:i for i,o in enumerate(words)}
 idx2word = {i:o for i,o in enumerate(words)}
 
-# With mapping, convert words in a sample into their corresponding indexes
-# 
 
-# for i in range(len(training_data)):
-    # for j in range(len(training_data[i])):
-        # for k, sentence in enumerate(training_data[i][j]):
-            # training_data[i][j][k] = [word2idx[word] if word in word2idx else 1 for word in sentence]
-        # Looking up the mapping dictionary and assigning the index to the respective words
+# Looking up the mapping dictionary and assigning the index to the respective words
 for i in range(len(training_data)):
     for j, sentence in enumerate(training_data[i]):
         # Looking up the mapping dictionary and assigning the index to the respective words
-        training_data[i][j] = [word2idx[word] if word in word2idx else 999 for word in sentence]
+        training_data[i][j] = [word2idx[word] if word in word2idx else 1 for word in sentence]
 
-# problem is that: 'main:' needs to be split into ['main', ':']
-# next is that all 'rbp,' needs to be split into ['rpb', ',']
 
-print('this is training data\n', training_data[0])
+for i in range(len(test_data)):
+    for j, sentence in enumerate(test_data[i]):
+        # For test sentences, we have to tokenize the sentences as well
+        # Trying to use '_UNIK' for unseen words, can change this at a later point 
+        test_data[i][j] = [word2idx[word] if word in word2idx else 0 for word in sentence]
+
+
+
+# Find index of largest sample: 
+longest_sample = len(training_data[i])
+longest_sample_index = 0
+
+for i in range(len(training_data)):
+    tmp = len(training_data[i])
+    if tmp > longest_sample:
+        longest_sample = tmp
+        longest_sample_index = i
+
+# Function for finding the longest code line in training data
+def find_max_list(list):
+    list_len = [len(i) for i in list]
+    return max(list_len)
+
+# Chose to take the longest line in the largest sample, this does not guarantie longest line, but we add some to it and pad the rest 
+max_seq = find_max_list(training_data[longest_sample_index]) + 2
+print('this is the max seq_len', max_seq)
+
+# Function for padding shorter lines of code to match the longest 
+
+'''
+def pad_input(data, seq_len):
+    features = np.zeros((len(data), seq_len),dtype=int)
+    for ii, review in enumerate(data):
+        if len(review) != 0:
+            features[ii, -len(review):] = np.array(review)[:seq_len]
+    return features
+
+
+
+print('this is training data\n', test_data[0])
 print(word2idx)
 
-
+'''
 print(train_labels)
 print(test_labels)
 
