@@ -1,4 +1,5 @@
-
+import torch 
+from torch.utils.data import TensorDataset, DataLoader
 import bz2
 from collections import Counter
 import re
@@ -73,5 +74,34 @@ for i, sentence in enumerate(test_sentences):
     # For test sentences, we have to tokenize the sentences as well
     test_sentences[i] = [word2idx[word.lower()] if word.lower() in word2idx else 0 for word in nltk.word_tokenize(sentence)]
 
-print(train_sentences[0])
-print(words)
+
+# Defining a function that either shortens sentences or pads sentences with 0 to a fixed length
+
+def pad_input(sentences, seq_len):
+    features = np.zeros((len(sentences), seq_len),dtype=int)
+    for ii, review in enumerate(sentences):
+        if len(review) != 0:
+            features[ii, -len(review):] = np.array(review)[:seq_len]
+    return features
+
+seq_len = 200 #The length that the sentences will be padded/shortened to
+
+train_sentences = pad_input(train_sentences, seq_len)
+test_sentences = pad_input(test_sentences, seq_len)
+
+# Converting our labels into numpy arrays
+train_labels = np.array(train_labels)
+test_labels = np.array(test_labels)
+
+split_frac = 0.5
+split_id = int(split_frac * len(test_sentences))
+val_sentences, test_sentences = test_sentences[:split_id], test_sentences[split_id:]
+val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
+
+print(train_sentences.shape)
+print('type of train_sentenece', type(train_sentences))
+print('type of train_sentenece[0]', type(train_sentences[0]))
+
+train_data = TensorDataset(torch.from_numpy(train_sentences), torch.from_numpy(train_labels))
+val_data = TensorDataset(torch.from_numpy(val_sentences), torch.from_numpy(val_labels))
+test_data = TensorDataset(torch.from_numpy(test_sentences), torch.from_numpy(test_labels))

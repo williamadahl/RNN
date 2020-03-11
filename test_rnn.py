@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
 from collections import Counter
 import re
 import nltk
@@ -64,7 +65,7 @@ for i, line in enumerate(train_file):
         words.update([word])
         
 # Store all data in 3D array training_data [ [sample1 [sentence1 ],[sentence2]...]...]
-training_data = [0]* len(train_labels) 
+training_data = np.zeros(len(train_labels), dtype=np.int) 
 
 for x in range(len(training_data)):
     # create a new list which will a singel sample 
@@ -125,7 +126,6 @@ for x in range(len(test_data)):
 
 del test_file, train_file
 
-print('this is training data\n', test_data[0])
 
 # Sorting the words according to the number of appearances, with the most common word being first
 words = sorted(words, key=words.get, reverse=True)
@@ -170,7 +170,9 @@ print('this is the max seq_len', max_seq)
 
 # Function for padding shorter lines of code to match the longest 
 
-'''
+# for i in range(len(training_data[0])):
+    # print('this is length for:', i, len(training_data[0][i]))
+
 def pad_input(data, seq_len):
     features = np.zeros((len(data), seq_len),dtype=int)
     for ii, review in enumerate(data):
@@ -178,12 +180,61 @@ def pad_input(data, seq_len):
             features[ii, -len(review):] = np.array(review)[:seq_len]
     return features
 
+for i in range(len(training_data)):
+    training_data[i] = pad_input(training_data[i],max_seq)
+
+for i in range(len(test_data)):
+    test_data[i] = pad_input(test_data[i],max_seq)
+
+# for i in range(len(training_data[0])):
+    # print('this is length for:', i, len(training_data[0][i]) )
 
 
-print('this is training data\n', test_data[0])
-print(word2idx)
 
-'''
+print(training_data[0].shape)
+# Convert labes into numpy arrays 
+train_labels = np.array(train_labels)
+test_labels = np.array(test_labels)
+# training_data = np.array(training_data)
+print('this is the original format training_data:', type(training_data))
+print('this is the original format training_data[0]:', type(training_data[0]))
+print('this is the original format training_data[0][0]:', type(training_data[0][0]))
+training_data = np.asarray(training_data)
+
+print(training_data.shape)
+
+print('this is the changed format training_data:', type(training_data))
+
+
+test = torch.tensor(training_data, dtype=torch.int)
+
+
+# pt_tensor_from_list = torch.FloatTensor(training_data)
+# print(type(pt_tensor_from_list))
+
+# for i in range(len(training_data)):
+    # training_data[i] = torch.Tensor(training_data[i])
+
+# training_data = torch.IntTensor(training_data)
+# print(type(training_data))
+
+# training_data = np.array(training_data)
+# convent lists into ndarray 
+# print(len(training_data[0]))
+# training_data = torch.from_numpy(training_data)
+
+# We need a dataset for validation during training, Chose to spilt in half, can adjust this later 
+
+split_frac = 0.5
+split_id = int(split_frac * len(test_data))
+validation_data, test_data = test_data[:split_id], test_data[split_id:]
+val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
+
+# Now we can set up the architecture 
+
+
 print(train_labels)
-print(test_labels)
 
+training_data = TensorDataset(torch.from_numpy(test), torch.from_numpy(train_labels))
+# val_data = TensorDataset(torch.from_numpy(validation_data), torch.from_numpy(val_labels))
+# test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_labels))
