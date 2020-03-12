@@ -1,5 +1,6 @@
 import torch 
 from torch.utils.data import TensorDataset, DataLoader
+from torch.utils import data 
 import bz2
 from collections import Counter
 import re
@@ -63,7 +64,6 @@ word2idx = {o:i for i,o in enumerate(words)}
 idx2word = {i:o for i,o in enumerate(words)}
 
 
-print('this is a training sample', train_sentences[0])
 
 
 
@@ -101,6 +101,25 @@ val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
 print(train_sentences.shape)
 print('type of train_sentenece', type(train_sentences))
 print('type of train_sentenece[0]', type(train_sentences[0]))
+print('this is a training sample', train_sentences)
+
+test = np.asarray([[0 for x in range(len(train_sentences[0]))] for y in range(len(train_sentences))])
+
+print(test.shape)
+np.insert(train_sentences)
+print(test)
+# np.insert(test, 1, train_sentences)
+# test = [train_sentences, train_sentences]
+test = np.asarray(test)
+test2 = [train_labels, train_labels]
+test2 = np.asarray(test2)
+# test.insert(train_sentences)
+
+print(test.shape)
+print(type(test[0]))
+
+test3 = TensorDataset(torch.from_numpy(test), torch.from_numpy(test2))
+print(type(test3))
 
 train_data = TensorDataset(torch.from_numpy(train_sentences), torch.from_numpy(train_labels))
 val_data = TensorDataset(torch.from_numpy(val_sentences), torch.from_numpy(val_labels))

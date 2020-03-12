@@ -65,7 +65,9 @@ for i, line in enumerate(train_file):
         words.update([word])
         
 # Store all data in 3D array training_data [ [sample1 [sentence1 ],[sentence2]...]...]
-training_data = np.zeros(len(train_labels), dtype=np.int) 
+training_data = [0]*len(train_labels)
+# training_data = np.zeros(len(train_labels), dtype=np.int) 
+print('first training data type:', type(training_data))
 
 for x in range(len(training_data)):
     # create a new list which will a singel sample 
@@ -149,7 +151,8 @@ for i in range(len(test_data)):
 
 
 
-# Find index of largest sample: 
+# Find index of largest sample and the longest data sample of both train and test dataset: 
+
 longest_sample = len(training_data[i])
 longest_sample_index = 0
 
@@ -166,75 +169,55 @@ def find_max_list(list):
 
 # Chose to take the longest line in the largest sample, this does not guarantie longest line, but we add some to it and pad the rest 
 max_seq = find_max_list(training_data[longest_sample_index]) + 2
-print('this is the max seq_len', max_seq)
+
 
 # Function for padding shorter lines of code to match the longest 
-
-# for i in range(len(training_data[0])):
-    # print('this is length for:', i, len(training_data[0][i]))
-
-def pad_input(data, seq_len):
+def pad_seq_len(data, seq_len):
     features = np.zeros((len(data), seq_len),dtype=int)
     for ii, review in enumerate(data):
         if len(review) != 0:
             features[ii, -len(review):] = np.array(review)[:seq_len]
     return features
 
+# Function for padding shorter samples to create a uniform 3D matrix of our data 
+def pad_sample_len(data, longest_sample):
+    diff = longest_sample - len(data)
+    padding = [[0]*2]
+    for i in range(diff):
+        data.extend(padding)
+    return data
+
+
+
 for i in range(len(training_data)):
-    training_data[i] = pad_input(training_data[i],max_seq)
+    training_data[i] = pad_sample_len(training_data[i], longest_sample)
+    training_data[i] = pad_seq_len(training_data[i],max_seq)
 
 for i in range(len(test_data)):
-    test_data[i] = pad_input(test_data[i],max_seq)
-
-# for i in range(len(training_data[0])):
-    # print('this is length for:', i, len(training_data[0][i]) )
+    test_data[i] = pad_sample_len(test_data[i], longest_sample)
+    test_data[i] = pad_seq_len(test_data[i],max_seq)
 
 
 
-print(training_data[0].shape)
-# Convert labes into numpy arrays 
+# Convert data and labels into numpy arrays 
 train_labels = np.array(train_labels)
 test_labels = np.array(test_labels)
-# training_data = np.array(training_data)
-print('this is the original format training_data:', type(training_data))
-print('this is the original format training_data[0]:', type(training_data[0]))
-print('this is the original format training_data[0][0]:', type(training_data[0][0]))
 training_data = np.asarray(training_data)
-
-print(training_data.shape)
-
-print('this is the changed format training_data:', type(training_data))
-
-
-test = torch.tensor(training_data, dtype=torch.int)
-
-
-# pt_tensor_from_list = torch.FloatTensor(training_data)
-# print(type(pt_tensor_from_list))
-
-# for i in range(len(training_data)):
-    # training_data[i] = torch.Tensor(training_data[i])
-
-# training_data = torch.IntTensor(training_data)
-# print(type(training_data))
-
-# training_data = np.array(training_data)
-# convent lists into ndarray 
-# print(len(training_data[0]))
-# training_data = torch.from_numpy(training_data)
+test_data = np.asarray(test_data)
 
 # We need a dataset for validation during training, Chose to spilt in half, can adjust this later 
-
 split_frac = 0.5
 split_id = int(split_frac * len(test_data))
 validation_data, test_data = test_data[:split_id], test_data[split_id:]
 val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
 
-# Now we can set up the architecture 
-
-
 print(train_labels)
 
-training_data = TensorDataset(torch.from_numpy(test), torch.from_numpy(train_labels))
-# val_data = TensorDataset(torch.from_numpy(validation_data), torch.from_numpy(val_labels))
-# test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_labels))
+# Create tensorDatasets for training, validation and testing 
+
+training_data = TensorDataset(torch.from_numpy(training_data), torch.from_numpy(train_labels))
+val_data = TensorDataset(torch.from_numpy(validation_data), torch.from_numpy(val_labels))
+test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_labels))
+
+
+# Now we can set up the architecture 
