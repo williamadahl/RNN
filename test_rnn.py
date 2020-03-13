@@ -153,7 +153,7 @@ for i in range(len(test_data)):
 
 # Find index of largest sample and the longest data sample of both train and test dataset: 
 
-longest_sample = len(training_data[i])
+longest_sample = len(training_data[0])
 longest_sample_index = 0
 
 for i in range(len(training_data)):
@@ -162,13 +162,42 @@ for i in range(len(training_data)):
         longest_sample = tmp
         longest_sample_index = i
 
+
+# Find longest sample in test data :
+
+longest_sample_test = len(test_data[0])
+longest_sample_index_test = 0
+
+for i in range(len(test_data)):
+    tmp = len(test_data[i])
+    if tmp > longest_sample_index_test:
+        longest_sample_index_test = tmp
+        longest_sample_index_test = i
+
+
+# Flag used as boolean 
+
+train_longest = 1 
+if longest_sample_test > longest_sample:
+    longest_sample = longest_sample_test 
+    longest_sample_index = longest_sample_index_test
+    train_longest = 0
+
+
 # Function for finding the longest code line in training data
 def find_max_list(list):
     list_len = [len(i) for i in list]
     return max(list_len)
 
+
 # Chose to take the longest line in the largest sample, this does not guarantie longest line, but we add some to it and pad the rest 
-max_seq = find_max_list(training_data[longest_sample_index]) + 2
+if train_longest:
+    print('train_longest')   
+    max_seq = find_max_list(training_data[longest_sample_index]) + 2
+else:
+    print('test longest')
+    max_seq = find_max_list(test_data[longest_sample_index]) + 2
+
 
 
 # Function for padding shorter lines of code to match the longest 
@@ -221,3 +250,7 @@ test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_lab
 
 
 # Now we can set up the architecture 
+'''
+Remember that I have to extend the search for biggest sapmle into both the training and the testing dataset, 
+remember to store the index and also which dataset it is in
+''' 
