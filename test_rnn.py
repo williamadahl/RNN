@@ -249,8 +249,23 @@ val_data = TensorDataset(torch.from_numpy(validation_data), torch.from_numpy(val
 test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_labels))
 
 
+
+# could chose to use shuffle here, and previously written logic for it 
+batch_size = 2
+train_loader = DataLoader(training_data, shuffle=True, batch_size=batch_size)
+val_loader = DataLoader(val_data, shuffle=True, batch_size=batch_size)
+test_loader = DataLoader(test_data, shuffle=True, batch_size=batch_size)
+
+
+# torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
+is_cuda = torch.cuda.is_available()
+# If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
+if is_cuda:
+    print('gpu')
+    device = torch.device("cuda")
+else:
+    print('cpu')
+    device = torch.device("cpu")
+
 # Now we can set up the architecture 
-'''
-Remember that I have to extend the search for biggest sapmle into both the training and the testing dataset, 
-remember to store the index and also which dataset it is in
-''' 
+
