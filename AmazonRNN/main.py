@@ -6,6 +6,7 @@ from collections import Counter
 import re
 import nltk
 import numpy as np
+import torch.nn as nn
 nltk.download('punkt')
 
 
@@ -103,24 +104,173 @@ print('type of train_sentenece', type(train_sentences))
 print('type of train_sentenece[0]', type(train_sentences[0]))
 print('this is a training sample', train_sentences)
 
-test = np.asarray([[0 for x in range(len(train_sentences[0]))] for y in range(len(train_sentences))])
 
-print(test.shape)
-np.insert(train_sentences)
-print(test)
 # np.insert(test, 1, train_sentences)
 # test = [train_sentences, train_sentences]
-test = np.asarray(test)
-test2 = [train_labels, train_labels]
-test2 = np.asarray(test2)
 # test.insert(train_sentences)
 
-print(test.shape)
-print(type(test[0]))
 
-test3 = TensorDataset(torch.from_numpy(test), torch.from_numpy(test2))
-print(type(test3))
 
 train_data = TensorDataset(torch.from_numpy(train_sentences), torch.from_numpy(train_labels))
 val_data = TensorDataset(torch.from_numpy(val_sentences), torch.from_numpy(val_labels))
 test_data = TensorDataset(torch.from_numpy(test_sentences), torch.from_numpy(test_labels))
+
+print(len(train_data))
+print(len(val_data))
+print(len(test_data))
+
+batch_size = 5
+
+train_loader = DataLoader(train_data, shuffle=False, batch_size=batch_size)
+val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
+test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
+
+
+print('this is the length of train_loader', len(train_loader))
+
+# torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
+is_cuda = torch.cuda.is_available()
+
+# If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
+if is_cuda:
+    print('cuda')
+    device = torch.device("cuda")
+else:
+    print('cpu')
+    device = torch.device("cpu")
+
+
+class SentimentNet(nn.Module):
+    def __init__(self, vocab_size, output_size, embedding_dim, hidden_dim, n_layers, drop_prob=0.5):
+        super(SentimentNet, self).__init__()
+        self.output_size = output_size
+        self.n_layers = n_layers
+        self.hidden_dim = hidden_dim
+        
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
+        self.dropout = nn.Dropout(drop_prob)
+        self.fc = nn.Linear(hidden_dim, output_size)
+        self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, x, hidden):
+        batch_size = x.size(0)
+        x = x.long()
+        embeds = self.embedding(x)
+        lstm_out, hidden = self.lstm(embeds, hidden)
+        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
+        
+        out = self.dropout(lstm_out)
+        out = self.fc(out)
+        out = self.sigmoid(out)
+        
+        out = out.view(batch_size, -1)
+        out = out[:,-1]
+        return out, hidden
+    
+    def init_hidden(self, batch_size):
+        weight = next(self.parameters()).data
+        hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
+                      weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device))
+        return hidden
+
+
+vocab_size = len(word2idx) + 1
+output_size = 1
+embedding_dim = 400 # Should this be the batchsize??
+hidden_dim = 512
+n_layers = 2
+
+model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
+model.to(device)
+print(model)
+
+
+lr=0.005
+criterion = nn.BCELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+epochs = 2
+counter = 0
+print_every = 10
+clip = 5
+valid_loss_min = np.Inf
+'''
+for i, (images, labels) in enumerate(train_loader):
+    print(images[0], len(images[0]))
+
+print(len(test_loader))
+'''
+model.train()
+
+test_list = []
+
+for i in range(epochs):
+    h = model.init_hidden(batch_size)
+    
+    for inputs, labels in train_loader:
+        print('counter is :', counter)
+        counter += 1
+        h = tuple([e.data for e in h])
+        inputs, labels = inputs.to(device), labels.to(device)
+        test_list.append(inputs)
+        # print('these are the inputs : ', inputs)
+        # print('these are the labels : ', labels)
+
+
+print('this is a input: ', len(test_list[0][0]))
+
+print(torch.eq(test_list[0], test_list[1]))
+'''
+        model.zero_grad()
+        output, h = model(inputs, h)
+        loss = criterion(output.squeeze(), labels.float())
+        loss.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), clip)
+        optimizer.step()
+        
+        if counter%print_every == 0:
+            val_h = model.init_hidden(batch_size)
+            val_losses = []
+            model.eval()
+            for inp, lab in val_loader:
+                val_h = tuple([each.data for each in val_h])
+                inp, lab = inp.to(device), lab.to(device)
+                out, val_h = model(inp, val_h)
+                val_loss = criterion(out.squeeze(), lab.float())
+                val_losses.append(val_loss.item())
+                
+            model.train()
+            print("Epoch: {}/{}...".format(i+1, epochs),
+                  "Step: {}...".format(counter),
+                  "Loss: {:.6f}...".format(loss.item()),
+                  "Val Loss: {:.6f}".format(np.mean(val_losses)))
+            if np.mean(val_losses) <= valid_loss_min:
+                torch.save(model.state_dict(), './state_dict.pt')
+                print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(valid_loss_min,np.mean(val_losses)))
+                valid_loss_min = np.mean(val_losses)
+
+
+#Loading the best model
+model.load_state_dict(torch.load('./state_dict.pt'))
+
+test_losses = []
+num_correct = 0
+h = model.init_hidden(batch_size)
+
+model.eval()
+for inputs, labels in test_loader:
+    h = tuple([each.data for each in h])
+    inputs, labels = inputs.to(device), labels.to(device)
+    output, h = model(inputs, h)
+    test_loss = criterion(output.squeeze(), labels.float())
+    test_losses.append(test_loss.item())
+    pred = torch.round(output.squeeze()) #rounds the output to 0/1
+    correct_tensor = pred.eq(labels.float().view_as(pred))
+    correct = np.squeeze(correct_tensor.cpu().numpy())
+    num_correct += np.sum(correct)
+        
+print("Test loss: {:.3f}".format(np.mean(test_losses)))
+test_acc = num_correct/len(test_loader.dataset)
+print("Test accuracy: {:.3f}%".format(test_acc*100))
+'''
