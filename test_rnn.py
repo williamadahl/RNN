@@ -261,10 +261,12 @@ test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
 
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
+# Hardcoded for my personal architecture 
+device = torch.device("cpu")
 # If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
 if is_cuda:
     print('gpu')
-    device = torch.device("cuda")
+    # device = torch.device("cuda")
 else:
     print('cpu')
     device = torch.device("cpu")
@@ -275,21 +277,43 @@ else:
 class SentimentNet(nn.Module):
     def __init__(self, vocab_size, output_size, embedding_dim, hidden_dim, n_layers, drop_prob=0.5):
         super(SentimentNet, self).__init__()
+        # This is set to 1 since binary classification 
         self.output_size = output_size
+        # Try two layers first only 
         self.n_layers = n_layers
+        # Hidden dimension is 512, but can of course change during hyper parameter optimization 
         self.hidden_dim = hidden_dim
         
+        # Set up the embedding lookup table that stores embeddings of a fixed dictionary and size. 
+        # vocab_size -- size of the dictionary of embeddings which is the unique number of tokens created in the word2idx (len(word2idx + 1))
+        # embedding_dim --  the size of each embedding vector (400)
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
+
+        # Set up multi layer LSTM RNN for the input sequence 
+        # embedding_dim --  The number of expected features in the input x (400)
+        # hidden_dim -- The number of features in the hidden state h (512)
+        # n_layers -- Number of recurrent layers (2)
+        # dropout --  Dropout layer on the outputs of each LSTM layer except the last layer (0.5) can optimize this also 
+        # batch_first -- input and output tensors are provided as (batch, seq, feature). Migth try without this 
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
+        # During training, randomly zeroes some of the elements of the input tensor with probability p using samples from a Bernoulli distribution
         self.dropout = nn.Dropout(drop_prob)
+        # Applies a linear transformation to the incoming data with inputsize hidden_dim (2), outputsize (1) 
         self.fc = nn.Linear(hidden_dim, output_size)
+        # Applies the element-wise function sigmoid 
         self.sigmoid = nn.Sigmoid()
-        
+
+    # Forward pass of the training defined here  
+    # x is the full tensor sendt into training ([2, 409, 11])
+    # hidden is the initialized hidden dimention with zero values should be the same as x      
     def forward(self, x, hidden):
         batch_size = x.size(0)
+        # Transform to unlimited precision 
         x = x.long()
         embeds = self.embedding(x)
+        # problem here with the 3D vs my 4D dimension 
         lstm_out, hidden = self.lstm(embeds, hidden)
+        print('in forward here is x')
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
         out = self.dropout(lstm_out)
@@ -308,6 +332,7 @@ class SentimentNet(nn.Module):
 
 
 vocab_size = len(word2idx) + 1
+print('vocab size ', vocab_size)
 output_size = 1
 embedding_dim = 400
 hidden_dim = 512
@@ -347,16 +372,13 @@ for i in range(epochs):
         h = tuple([e.data for e in h])
         inputs, labels = inputs.to(device), labels.to(device)
         test_list.append(inputs)
-        label_list.append(labels)
-
-print('this is a label', label_list[0])
-print('this is a input', len(test_list[0][0][0]))
-print(torch.eq(test_list[0][0], test_list[1][0]))
+        label_list.append(labels)   
 
 
-'''
+
         model.zero_grad()
         output, h = model(inputs, h)
+'''
         loss = criterion(output.squeeze(), labels.float())
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)
@@ -385,3 +407,6 @@ print(torch.eq(test_list[0][0], test_list[1][0]))
 
 
 '''
+print('this is a label', label_list[0])
+print('this is a input', test_list[0])
+print(torch.eq(test_list[0][0], test_list[1][0]))

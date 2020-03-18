@@ -209,6 +209,7 @@ for i in range(epochs):
     h = model.init_hidden(batch_size)
     
     for inputs, labels in train_loader:
+        
         print('counter is :', counter)
         counter += 1
         h = tuple([e.data for e in h])
@@ -218,7 +219,7 @@ for i in range(epochs):
         # print('these are the labels : ', labels)
 
 
-print('this is a input: ', len(test_list[0][0]))
+print('this is a input: ', test_list[0])
 
 print(torch.eq(test_list[0], test_list[1]))
 '''
