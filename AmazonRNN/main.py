@@ -155,8 +155,14 @@ class SentimentNet(nn.Module):
         
     def forward(self, x, hidden):
         batch_size = x.size(0)
+        print('this is a sample:', x)
+        print('this is batch_size', batch_size)
         x = x.long()
+        # x = ( 5, 200)
         embeds = self.embedding(x)
+        print('this is the embeds after embedding:', embeds, len(embeds), len(embeds[0]), len(embeds[0][0]))
+        # Embeds = ( 5, 200, 400)
+        raise SystemExit(0)
         lstm_out, hidden = self.lstm(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
@@ -195,16 +201,12 @@ counter = 0
 print_every = 10
 clip = 5
 valid_loss_min = np.Inf
-'''
-for i, (images, labels) in enumerate(train_loader):
-    print(images[0], len(images[0]))
 
-print(len(test_loader))
-'''
+
 model.train()
 
 test_list = []
-
+# Train loader dims: (12,5,200)
 for i in range(epochs):
     h = model.init_hidden(batch_size)
     
@@ -219,12 +221,14 @@ for i in range(epochs):
         # print('these are the labels : ', labels)
 
 
-print('this is a input: ', test_list[0])
+        # print('this is a input: ', test_list[0])
 
-print(torch.eq(test_list[0], test_list[1]))
-'''
+        # print(torch.eq(test_list[0], test_list[1]))
         model.zero_grad()
         output, h = model(inputs, h)
+        print('this is output: ', output, len(output))
+        raise SystemExit(0)
+'''
         loss = criterion(output.squeeze(), labels.float())
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)

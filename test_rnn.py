@@ -66,8 +66,6 @@ for i, line in enumerate(train_file):
         
 # Store all data in 3D array training_data [ [sample1 [sentence1 ],[sentence2]...]...]
 training_data = [0]*len(train_labels)
-# training_data = np.zeros(len(train_labels), dtype=np.int) 
-print('first training data type:', type(training_data))
 
 for x in range(len(training_data)):
     # create a new list which will a singel sample 
@@ -254,7 +252,7 @@ print(len(test_data))
 
 # could chose to use shuffle here, and previously written logic for it 
 batch_size = 2
-train_loader = DataLoader(training_data, shuffle=False, batch_size=batch_size)
+train_loader = DataLoader(training_data, shuffle=False,  batch_size=batch_size)
 val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
 test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
 
@@ -286,11 +284,11 @@ class SentimentNet(nn.Module):
         
         # Set up the embedding lookup table that stores embeddings of a fixed dictionary and size. 
         # vocab_size -- size of the dictionary of embeddings which is the unique number of tokens created in the word2idx (len(word2idx + 1))
-        # embedding_dim --  the size of each embedding vector (400)
+        # embedding_dim --  the size of each embedding vector (11$)
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
 
         # Set up multi layer LSTM RNN for the input sequence 
-        # embedding_dim --  The number of expected features in the input x (400)
+        # embedding_dim --  The number of expected features in the input x (11)
         # hidden_dim -- The number of features in the hidden state h (512)
         # n_layers -- Number of recurrent layers (2)
         # dropout --  Dropout layer on the outputs of each LSTM layer except the last layer (0.5) can optimize this also 
@@ -298,7 +296,7 @@ class SentimentNet(nn.Module):
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
         # During training, randomly zeroes some of the elements of the input tensor with probability p using samples from a Bernoulli distribution
         self.dropout = nn.Dropout(drop_prob)
-        # Applies a linear transformation to the incoming data with inputsize hidden_dim (2), outputsize (1) 
+        # Applies a linear transformation to the incoming data with inputsize hidden_dim (512), outputsize (2) 
         self.fc = nn.Linear(hidden_dim, output_size)
         # Applies the element-wise function sigmoid 
         self.sigmoid = nn.Sigmoid()
@@ -307,40 +305,70 @@ class SentimentNet(nn.Module):
     # x is the full tensor sendt into training ([2, 409, 11])
     # hidden is the initialized hidden dimention with zero values should be the same as x      
     def forward(self, x, hidden):
-        batch_size = x.size(0)
+        print('This is sapmle: ', x )
+        # batch_size = x.size(0)
+        print('batch_size is set to : ', batch_size)
+        
         # Transform to unlimited precision 
         x = x.long()
+        print('this is the x dims: ', len(x), len(x[0]), len(x[0][0]))
         embeds = self.embedding(x)
+        # After this embedding, we have a dim of : (batch_size, sample_len, line, embedding_dim)(2, 409, 11,11)
+        print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]))
+        raise SystemExit(0)
+        '''
+        what if I send in loop each part of x to embedding?
+        '''
+        for i in range(len(x)):
+            print('this is what x[i] is:', x[i])
+            embeds = self.embedding(x[i])
+            # (2, 409, 11, 11) right now would be considering word by word in a code line 
+            # (2, 409, 50) should be something like this would be considering line by line of code 
+
+            print('this is the embeds: ', embeds)
+            print('this is the embeds after embedding:', embeds, len(embeds), len(embeds[0]), len(embeds[0][0]))
+            lstm_out, hidden = self.lstm(embeds, hidden)
+            # Returns a contiguous tensor containing the same data as self, if it is contiguous it returns self 
+            lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
+            print(i)
+            raise SystemExit(0)
+
+
+        # embeds = self.embedding(x)
+        # print('in forward')
         # problem here with the 3D vs my 4D dimension 
-        lstm_out, hidden = self.lstm(embeds, hidden)
-        print('in forward here is x')
-        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
+        # lstm_out, hidden = self.lstm(embeds, hidden)
+        # print('Running forward on: ', x)
+        # Returns a contiguous tensor containing the same data as self, if it is contiguous it returns self 
+        # lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
-        out = self.dropout(lstm_out)
+        out = self.dropout(lstm_out)  
         out = self.fc(out)
         out = self.sigmoid(out)
         
+        # Hacked this out is now a 409 length vector 
         out = out.view(batch_size, -1)
+
         out = out[:,-1]
         return out, hidden
-    
+
+
+   # Problem here defining the batch size, as 'batch_size' really is the number of lines?  
     def init_hidden(self, batch_size):
         weight = next(self.parameters()).data
-        hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
-                      weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device))
+        hidden = (weight.new(self.n_layers, longest_sample, self.hidden_dim).zero_().to(device),
+                      weight.new(self.n_layers, longest_sample , self.hidden_dim).zero_().to(device))
         return hidden
 
 
 vocab_size = len(word2idx) + 1
 print('vocab size ', vocab_size)
 output_size = 1
-embedding_dim = 400
+embedding_dim = 11 # shoud be more than the input vector and less than dictionary length 
 hidden_dim = 512
 n_layers = 2
-
 model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
 print(model)
-
 
 lr=0.005
 criterion = nn.BCELoss()
@@ -355,22 +383,27 @@ valid_loss_min = np.Inf
 model.train()
 
 # Se each sample is in this 
-for i, (images, labels) in enumerate(train_loader):
+'''
+for i, (images, labels) in enumerate(tSæravtale for Spesialstyrker i Forsvaretrain_loader):
     print(images[0][0])
     print(len(images[0]))
-
+'''
 
 test_list = []
 label_list = []
 
-for i in range(epochs):
 
-    
+# Trainloader dimensions: (8,2,409,11)
+for i in range(epochs):
     h = model.init_hidden(batch_size)    
+    print('in epoch: ', i)
     for inputs, labels in train_loader:
+        print('in inputs, labels')
         counter += 1
         h = tuple([e.data for e in h])
+        print('this is the len of an input: ', len(inputs))
         inputs, labels = inputs.to(device), labels.to(device)
+
         test_list.append(inputs)
         label_list.append(labels)   
 
@@ -378,9 +411,23 @@ for i in range(epochs):
 
         model.zero_grad()
         output, h = model(inputs, h)
-'''
+        print('this is ouput:', output, len(output))
+        
+        
         loss = criterion(output.squeeze(), labels.float())
-        loss.backward()
+        # loss.backward()
+
+
+raise SystemExit(0)
+sample = test_list[i][100]
+for e in range(len(test_list)):
+    print(torch.eq(sample, test_list[i][50]), e)
+
+
+'''
+print('this is a label', label_list[0])
+print('this is a input', test_list[0])
+
         nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
         
@@ -407,6 +454,3 @@ for i in range(epochs):
 
 
 '''
-print('this is a label', label_list[0])
-print('this is a input', test_list[0])
-print(torch.eq(test_list[0][0], test_list[1][0]))
