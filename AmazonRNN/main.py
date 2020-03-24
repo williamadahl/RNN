@@ -99,17 +99,6 @@ split_id = int(split_frac * len(test_sentences))
 val_sentences, test_sentences = test_sentences[:split_id], test_sentences[split_id:]
 val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
 
-print(train_sentences.shape)
-print('type of train_sentenece', type(train_sentences))
-print('type of train_sentenece[0]', type(train_sentences[0]))
-print('this is a training sample', train_sentences)
-
-
-# np.insert(test, 1, train_sentences)
-# test = [train_sentences, train_sentences]
-# test.insert(train_sentences)
-
-
 
 train_data = TensorDataset(torch.from_numpy(train_sentences), torch.from_numpy(train_labels))
 val_data = TensorDataset(torch.from_numpy(val_sentences), torch.from_numpy(val_labels))
@@ -126,7 +115,6 @@ val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
 test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
 
 
-print('this is the length of train_loader', len(train_loader))
 
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
@@ -155,14 +143,10 @@ class SentimentNet(nn.Module):
         
     def forward(self, x, hidden):
         batch_size = x.size(0)
-        print('this is a sample:', x)
-        print('this is batch_size', batch_size)
         x = x.long()
         # x = ( 5, 200)
         embeds = self.embedding(x)
-        print('this is the embeds after embedding:', embeds, len(embeds), len(embeds[0]), len(embeds[0][0]))
         # Embeds = ( 5, 200, 400)
-        raise SystemExit(0)
         lstm_out, hidden = self.lstm(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
@@ -212,22 +196,12 @@ for i in range(epochs):
     
     for inputs, labels in train_loader:
         
-        print('counter is :', counter)
         counter += 1
         h = tuple([e.data for e in h])
         inputs, labels = inputs.to(device), labels.to(device)
         test_list.append(inputs)
-        # print('these are the inputs : ', inputs)
-        # print('these are the labels : ', labels)
-
-
-        # print('this is a input: ', test_list[0])
-
-        # print(torch.eq(test_list[0], test_list[1]))
         model.zero_grad()
         output, h = model(inputs, h)
-        print('this is output: ', output, len(output))
-        raise SystemExit(0)
 
         loss = criterion(output.squeeze(), labels.float())
         loss.backward()

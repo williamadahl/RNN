@@ -232,13 +232,12 @@ test_labels = np.array(test_labels)
 training_data = np.asarray(training_data)
 test_data = np.asarray(test_data)
 
+
 # We need a dataset for validation during training, Chose to spilt in half, can adjust this later 
 split_frac = 0.5
 split_id = int(split_frac * len(test_data))
 validation_data, test_data = test_data[:split_id], test_data[split_id:]
 val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
-
-print(train_labels)
 
 # Create tensorDatasets for training, validation and testing 
 
@@ -368,9 +367,6 @@ for i, (images, labels) in enumerate(tSæravtale for Spesialstyrker i Forsvaretr
     print(len(images[0]))
 '''
 
-test_list = []
-label_list = []
-
 
 # Trainloader dimensions: (8,2,409,11)
 for i in range(epochs):
@@ -382,8 +378,6 @@ for i in range(epochs):
         h = tuple([e.data for e in h])
         # print('this is the len of an input: ', len(inputs))
         inputs, labels = inputs.to(device), labels.to(device)
-        test_list.append(inputs)
-        label_list.append(labels)   
         model.zero_grad()
         output, h = model(inputs, h)
         # print('this is ouput:', output, len(output))
