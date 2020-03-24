@@ -293,7 +293,7 @@ class SentimentNet(nn.Module):
         # n_layers -- Number of recurrent layers (2)
         # dropout --  Dropout layer on the outputs of each LSTM layer except the last layer (0.5) can optimize this also 
         # batch_first -- input and output tensors are provided as (batch, seq, feature). Migth try without this 
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
+        self.lstm = nn.LSTM(embedding_dim*embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
         # During training, randomly zeroes some of the elements of the input tensor with probability p using samples from a Bernoulli distribution
         self.dropout = nn.Dropout(drop_prob)
         # Applies a linear transformation to the incoming data with inputsize hidden_dim (512), outputsize (2) 
@@ -305,66 +305,45 @@ class SentimentNet(nn.Module):
     # x is the full tensor sendt into training ([2, 409, 11])
     # hidden is the initialized hidden dimention with zero values should be the same as x      
     def forward(self, x, hidden):
-        print('This is sapmle: ', x )
-        # batch_size = x.size(0)
-        print('batch_size is set to : ', batch_size)
+        # print('This is sapmle: ', x )
+        batch_size = x.size(0)
+        # print('batch_size is set to : ', batch_size)
         
         # Transform to unlimited precision 
         x = x.long()
-        print('this is the x dims: ', len(x), len(x[0]), len(x[0][0]))
+        # print('this is the x dims: ', len(x), len(x[0]), len(x[0][0]))
         embeds = self.embedding(x)
         # After this embedding, we have a dim of : (batch_size, sample_len, line, embedding_dim)(2, 409, 11,11)
-        print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]))
-        raise SystemExit(0)
-        '''
-        what if I send in loop each part of x to embedding?
-        '''
-        for i in range(len(x)):
-            print('this is what x[i] is:', x[i])
-            embeds = self.embedding(x[i])
-            # (2, 409, 11, 11) right now would be considering word by word in a code line 
-            # (2, 409, 50) should be something like this would be considering line by line of code 
+        # print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]), embeds[0][100][1][1])
 
-            print('this is the embeds: ', embeds)
-            print('this is the embeds after embedding:', embeds, len(embeds), len(embeds[0]), len(embeds[0][0]))
-            lstm_out, hidden = self.lstm(embeds, hidden)
-            # Returns a contiguous tensor containing the same data as self, if it is contiguous it returns self 
-            lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
-            print(i)
-            raise SystemExit(0)
-
-
-        # embeds = self.embedding(x)
-        # print('in forward')
-        # problem here with the 3D vs my 4D dimension 
-        # lstm_out, hidden = self.lstm(embeds, hidden)
-        # print('Running forward on: ', x)
-        # Returns a contiguous tensor containing the same data as self, if it is contiguous it returns self 
-        # lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
+        embeds = torch.reshape(embeds, (batch_size, longest_sample, embedding_dim*embedding_dim))
+        # print('this is the changed dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), embeds[0][100][12])
+        
+        # print('this is the hidden:', len(hidden), len(hidden[0]), len(hidden[0][0]))
+        lstm_out, hidden = self.lstm(embeds, hidden)
+        lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
         out = self.dropout(lstm_out)  
         out = self.fc(out)
         out = self.sigmoid(out)
         
-        # Hacked this out is now a 409 length vector 
         out = out.view(batch_size, -1)
 
         out = out[:,-1]
         return out, hidden
 
-
    # Problem here defining the batch size, as 'batch_size' really is the number of lines?  
     def init_hidden(self, batch_size):
         weight = next(self.parameters()).data
-        hidden = (weight.new(self.n_layers, longest_sample, self.hidden_dim).zero_().to(device),
-                      weight.new(self.n_layers, longest_sample , self.hidden_dim).zero_().to(device))
+        hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
+                      weight.new(self.n_layers, batch_size , self.hidden_dim).zero_().to(device))
         return hidden
 
 
 vocab_size = len(word2idx) + 1
 print('vocab size ', vocab_size)
 output_size = 1
-embedding_dim = 11 # shoud be more than the input vector and less than dictionary length 
+embedding_dim = 11  
 hidden_dim = 512
 n_layers = 2
 model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
@@ -374,9 +353,9 @@ lr=0.005
 criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-epochs = 1
+epochs = 2
 counter = 0
-print_every = 10
+print_every = 1
 clip = 5
 valid_loss_min = np.Inf
 
@@ -396,38 +375,20 @@ label_list = []
 # Trainloader dimensions: (8,2,409,11)
 for i in range(epochs):
     h = model.init_hidden(batch_size)    
-    print('in epoch: ', i)
+    # print('in epoch: ', i)
     for inputs, labels in train_loader:
-        print('in inputs, labels')
+        # print('in inputs, labels')
         counter += 1
         h = tuple([e.data for e in h])
-        print('this is the len of an input: ', len(inputs))
+        # print('this is the len of an input: ', len(inputs))
         inputs, labels = inputs.to(device), labels.to(device)
-
         test_list.append(inputs)
         label_list.append(labels)   
-
-
-
         model.zero_grad()
         output, h = model(inputs, h)
-        print('this is ouput:', output, len(output))
-        
-        
+        # print('this is ouput:', output, len(output))
         loss = criterion(output.squeeze(), labels.float())
-        # loss.backward()
-
-
-raise SystemExit(0)
-sample = test_list[i][100]
-for e in range(len(test_list)):
-    print(torch.eq(sample, test_list[i][50]), e)
-
-
-'''
-print('this is a label', label_list[0])
-print('this is a input', test_list[0])
-
+        loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
         
@@ -453,4 +414,24 @@ print('this is a input', test_list[0])
                 valid_loss_min = np.mean(val_losses)
 
 
-'''
+#Loading the best model
+model.load_state_dict(torch.load('./state_dict.pt'))
+test_losses = []
+num_correct = 0
+h = model.init_hidden(batch_size)
+
+model.eval()
+for inputs, labels in test_loader:
+    h = tuple([each.data for each in h])
+    inputs, labels = inputs.to(device), labels.to(device)
+    output, h = model(inputs, h)
+    test_loss = criterion(output.squeeze(), labels.float())
+    test_losses.append(test_loss.item())
+    pred = torch.round(output.squeeze()) #rounds the output to 0/1
+    correct_tensor = pred.eq(labels.float().view_as(pred))
+    correct = np.squeeze(correct_tensor.cpu().numpy())
+    num_correct += np.sum(correct)
+        
+print("Test loss: {:.3f}".format(np.mean(test_losses)))
+test_acc = num_correct/len(test_loader.dataset)
+print("Test accuracy: {:.3f}%".format(test_acc*100))

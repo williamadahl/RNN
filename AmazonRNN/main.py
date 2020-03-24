@@ -228,7 +228,7 @@ for i in range(epochs):
         output, h = model(inputs, h)
         print('this is output: ', output, len(output))
         raise SystemExit(0)
-'''
+
         loss = criterion(output.squeeze(), labels.float())
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)
@@ -278,4 +278,3 @@ for inputs, labels in test_loader:
 print("Test loss: {:.3f}".format(np.mean(test_losses)))
 test_acc = num_correct/len(test_loader.dataset)
 print("Test accuracy: {:.3f}%".format(test_acc*100))
-'''
