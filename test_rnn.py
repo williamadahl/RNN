@@ -199,10 +199,7 @@ for i in range(len(test_data)):
         # Trying to use '_UNIK' for unseen words, can change this at a later point 
         test_data[i][j] = [word2idx[word] if word in word2idx else 0 for word in sentence]
 
-
-
 # Find index of largest sample and the longest data sample of both train and test dataset: 
-
 longest_sample = len(training_data[0])
 longest_sample_index = 0
 
@@ -214,7 +211,6 @@ for i in range(len(training_data)):
 
 
 # Find longest sample in test data :
-
 longest_sample_test = len(test_data[0])
 longest_sample_index_test = 0
 
@@ -224,17 +220,12 @@ for i in range(len(test_data)):
         longest_sample_index_test = tmp
         longest_sample_index_test = i
 
-
-# Flag used as boolean def plot_progress(train_progress, devel_progress, out_filename=None):
-
-
+# Flag used as boolean
 train_longest = 1 
 if longest_sample_test > longest_sample:
     longest_sample = longest_sample_test 
     longest_sample_index = longest_sample_index_test
     train_longest = 0
-
-
 
 
 # Chose to take the longest line in the largest sample, this does not guarantie longest line, but we add some to it and pad the rest 
@@ -327,40 +318,23 @@ class SentimentNet(nn.Module):
     # x is the full tensor sendt into training ([2, 409, 11])
     # hidden is the initialized hidden dimention with zero values should be the same as x      
     def forward(self, x, hidden):
-        # print('This is sapmle: ', x )
         batch_size = x.size(0)
-
-        # print('batch_size is set to : ', batch_size)
-        
         # Transform to unlimited precision 
         x = x.long()
-        # print('this is the x dims: ', len(x), len(x[0]), len(x[0][0]))
         embeds = self.embedding(x)
         # After this embedding, we have a dim of : (batch_size, sample_len, line, embedding_dim)(2, 409, 11,11)
-        # print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]), embeds[0][0][0][0])
-
         embeds = torch.reshape(embeds, (batch_size, longest_sample, embedding_dim*embedding_dim))
-        # print('this is the changed dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), embeds[0][0][0])
-        # print('this is the final dim: ', embeds[0][0])
-        
-        # print('this is the hidden:', len(hidden), len(hidden[0]), len(hidden[0][0]))
         lstm_out, hidden = self.lstm(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
-        
         out = self.dropout(lstm_out) 
-        # out = self.lstm(lstm_out) 
         out = self.fc(out)
         out = self.sigmoid(out)
-        
         out = out.view(batch_size, -1)
-
         out = out[:,-1]
         return out, hidden
 
    # Problem here defining the batch size, as 'batch_size' really is the number of lines?  
     def init_hidden(self, batch_size):
-        # print('in init: ', batch_size)
-
         weight = next(self.parameters()).data
         hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
                       weight.new(self.n_layers, batch_size , self.hidden_dim).zero_().to(device))
@@ -383,14 +357,11 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 epochs = 3
 clip = 5
 valid_loss_min = np.Inf
-
 model.train()
 
-# variables introduced : 
 train_steps = []
 train_ccr = []
 train_cost = []   # Same as training loss, but over more samples 
-
 devel_steps = []
 devel_ccr = []
 
@@ -399,27 +370,20 @@ train_progress_conf = 5
 validation_progress_conf = 5
 step = 0
 
-# Trainloader dimensions: (8,2,409,11)
 for i in range(epochs):
     h = model.init_hidden(batch_size) 
-    # print('in epoch: ', i)
     for inputs, labels in train_loader:
         step += 1
         num_correct_train = 0
         h = tuple([e.data for e in h])
-        # print('this is the len of an input: ', len(inputs))
         inputs, labels = inputs.to(device), labels.to(device)
-        # print('this was the labels: ', labels)
         model.zero_grad()
         output, h = model(inputs, h)
-      #  print('this is ouput:', output, len(output))
         pred = torch.round(output.squeeze()) #rounds the output to 0/1
-        # print('this is the prediction:', pred)
         correct_tensor = pred.eq(labels.float().view_as(pred))
         num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
         num_correct_since_last_check += num_correct
         loss = criterion(output.squeeze(), labels.float())
-        # train_progress.append(loss.item())
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
@@ -434,7 +398,8 @@ for i in range(epochs):
             train_steps.append(step)
             train_ccr.append(running_ccr)
             train_cost.append(loss.item())
-        
+            
+        # log validation progress         
         if step%validation_progress_conf == 0:
             valid_counter = 0
             num_validated = 0
@@ -481,12 +446,10 @@ model.eval()
 for inputs, labels in test_loader:
     h = tuple([each.data for each in h])
     inputs, labels = inputs.to(device), labels.to(device)
-    # print('These are the labels: ', labels)
     output, h = model(inputs, h)
     test_loss = criterion(output.squeeze(), labels.float())
     test_losses.append(test_loss.item())
     pred = torch.round(output.squeeze()) #rounds the output to 0/1
-    # print('These are the predictions :', pred)
     correct_tensor = pred.eq(labels.float().view_as(pred))
     correct = np.squeeze(correct_tensor.cpu().numpy())
     num_correct += np.sum(correct)
@@ -494,25 +457,7 @@ for inputs, labels in test_loader:
 print("Test loss: {:.3f}".format(np.mean(test_losses)))
 test_acc = num_correct/len(test_loader.dataset)
 print("Test accuracy: {:.3f}%".format(test_acc*100))
-
 train_progress = {'steps': train_steps, 'ccr': train_ccr, 'cost': train_cost}
 devel_progress = {'steps': devel_steps, 'ccr': devel_ccr}
 
 plot_progress(train_progress, devel_progress, 'plot')
-sys.exit()
-
-
-'''
-plt.plot(train_progress)
-plt.ylabel('Training loss')
-plt.xlabel('Step')
-plt.savefig('training_loss.svg', format='svg', dpi=1200)
-plt.show()
-
-
-plt.plot(correct_predictions)
-plt.ylabel('Training acc')
-plt.xlabel('Step')
-plt.savefig('training_acc.svg', format='svg', dpi=1200)
-plt.show()
-'''
