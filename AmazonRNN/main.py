@@ -8,6 +8,7 @@ import nltk
 import numpy as np
 import torch.nn as nn
 nltk.download('punkt')
+import sys 
 
 
 test_file = bz2.BZ2File('./Reviews/test.ft.txt.bz2')
@@ -99,6 +100,9 @@ split_id = int(split_frac * len(test_sentences))
 val_sentences, test_sentences = test_sentences[:split_id], test_sentences[split_id:]
 val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
 
+print(type(train_sentences), type(train_labels))
+print(type(val_sentences), type(val_labels))
+print(type(test_sentences), type(test_labels))
 
 train_data = TensorDataset(torch.from_numpy(train_sentences), torch.from_numpy(train_labels))
 val_data = TensorDataset(torch.from_numpy(val_sentences), torch.from_numpy(val_labels))
@@ -122,7 +126,7 @@ is_cuda = torch.cuda.is_available()
 # If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
 if is_cuda:
     print('cuda')
-    device = torch.device("cuda")
+    device = torch.device("cpu")
 else:
     print('cpu')
     device = torch.device("cpu")
@@ -146,7 +150,11 @@ class SentimentNet(nn.Module):
         x = x.long()
         # x = ( 5, 200)
         embeds = self.embedding(x)
+        print('this is the final dim: ', embeds[0][0])
+        # print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]))
         # Embeds = ( 5, 200, 400)
+        # print('this is the final dim: ', embeds[0][0])
+        # sys.exit()
         lstm_out, hidden = self.lstm(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
@@ -180,7 +188,7 @@ lr=0.005
 criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-epochs = 2
+epochs = 6
 counter = 0
 print_every = 10
 clip = 5
@@ -196,6 +204,9 @@ for i in range(epochs):
     
     for inputs, labels in train_loader:
         
+        # print('this is a label: ', labels)
+        # print('this is a inputs: ', inputs)
+        # sys.exit()
         counter += 1
         h = tuple([e.data for e in h])
         inputs, labels = inputs.to(device), labels.to(device)
@@ -242,9 +253,12 @@ for inputs, labels in test_loader:
     h = tuple([each.data for each in h])
     inputs, labels = inputs.to(device), labels.to(device)
     output, h = model(inputs, h)
+    print('this is an output: ', output)
     test_loss = criterion(output.squeeze(), labels.float())
+    print('this is the test loss: ', test_loss)
     test_losses.append(test_loss.item())
     pred = torch.round(output.squeeze()) #rounds the output to 0/1
+    print('this is the preds :', pred)
     correct_tensor = pred.eq(labels.float().view_as(pred))
     correct = np.squeeze(correct_tensor.cpu().numpy())
     num_correct += np.sum(correct)

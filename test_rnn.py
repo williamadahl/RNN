@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
@@ -6,9 +7,65 @@ import re
 import nltk
 nltk.download('punkt')
 import numpy as np
+import sys 
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
+
+# Function for plotting progress 
+def plot_progress(train_progress, devel_progress, out_filename=None):
+    """Plot a chart of the training progress"""
+
+    fig, ax1 = plt.subplots(figsize=(8, 6), dpi=100)
+    ax1.plot(train_progress['steps'], train_progress['ccr'], 'b', label='Training set ccr')
+    ax1.plot(devel_progress['steps'], devel_progress['ccr'], 'r', label='Development set ccr')
+    ax1.set_xlabel('Steps')
+    ax1.set_ylabel('Correct classification rate')
+    ax1.legend(loc='lower left', bbox_to_anchor=(0.6, 0.52), framealpha=1.0)
+
+    ax2 = ax1.twinx()
+    ax2.plot(train_progress['steps'], train_progress['cost'], 'g', label='Training set cost')
+    ax2.set_ylabel('Binary cross entropy loss')
+    gl2 = ax2.get_ygridlines()
+    for gl in gl2:
+        gl.set_linestyle(':')
+        gl.set_color('k')
+
+    ax2.legend(loc='lower left', bbox_to_anchor=(0.6, 0.45), framealpha=1.0)
+    plt.title('Training progress')
+    fig.tight_layout()
+
+    if out_filename is not None:
+        plt.savefig(out_filename)
+
+    plt.show()
+
+
+# Function for finding the longest code line in training data
+def find_max_list(list):
+    list_len = [len(i) for i in list]
+    return max(list_len)
+
+
+# Function for padding shorter lines of code to match the longest 
+def pad_seq_len(data, seq_len):
+    features = np.zeros((len(data), seq_len),dtype=int)
+    for ii, review in enumerate(data):
+        if len(review) != 0:
+            features[ii, -len(review):] = np.array(review)[:seq_len]
+    return features
+
+# Function for padding shorter samples to create a uniform 3D matrix of our data 
+def pad_sample_len(data, longest_sample):
+    diff = longest_sample - len(data)
+    padding = [[0]*2]
+    for i in range(diff):
+        data.extend(padding)
+    return data
+
 
 
 print(torch.__version__)
+
 
 # Read in all training and testing data 
 f = open('../VulnerabilityGenerator/FinalizedData/Train.txt','r')
@@ -37,8 +94,6 @@ for i in range(len(train_file)):
         train_file[i] = 'main :\n'
         main_indexes_train.append(i)
 
-print(main_indexes_train)
-
 # Extract and remove the labels in testing set
 test_labels = []
 main_indexes_test = [] # list to store the main: indexes, aka each new data sample 
@@ -53,12 +108,10 @@ for i in range(len(test_file)):
         test_file[i] = 'main :\n'
         main_indexes_test.append(i)
 
-print(main_indexes_test)
 
 # Create dictionary to map all words to the number of times it occurs in all training sencences
 # This is the tokenization 
 words = Counter()
-
 
 for i, line in enumerate(train_file):
     for word in nltk.word_tokenize(line):
@@ -133,7 +186,6 @@ words = ['_PAD','_UNK'] + words
 word2idx = {o:i for i,o in enumerate(words)}
 idx2word = {i:o for i,o in enumerate(words)}
 
-
 # Looking up the mapping dictionary and assigning the index to the respective words
 for i in range(len(training_data)):
     for j, sentence in enumerate(training_data[i]):
@@ -173,7 +225,8 @@ for i in range(len(test_data)):
         longest_sample_index_test = i
 
 
-# Flag used as boolean 
+# Flag used as boolean def plot_progress(train_progress, devel_progress, out_filename=None):
+
 
 train_longest = 1 
 if longest_sample_test > longest_sample:
@@ -182,39 +235,13 @@ if longest_sample_test > longest_sample:
     train_longest = 0
 
 
-# Function for finding the longest code line in training data
-def find_max_list(list):
-    list_len = [len(i) for i in list]
-    return max(list_len)
 
 
 # Chose to take the longest line in the largest sample, this does not guarantie longest line, but we add some to it and pad the rest 
 if train_longest:
-    print('train_longest')   
-    max_seq = find_max_list(training_data[longest_sample_index]) + 2
+    max_seq = find_max_list(training_data[longest_sample_index]) 
 else:
-    print('test longest')
-    max_seq = find_max_list(test_data[longest_sample_index]) + 2
-
-
-
-# Function for padding shorter lines of code to match the longest 
-def pad_seq_len(data, seq_len):
-    features = np.zeros((len(data), seq_len),dtype=int)
-    for ii, review in enumerate(data):
-        if len(review) != 0:
-            features[ii, -len(review):] = np.array(review)[:seq_len]
-    return features
-
-# Function for padding shorter samples to create a uniform 3D matrix of our data 
-def pad_sample_len(data, longest_sample):
-    diff = longest_sample - len(data)
-    padding = [[0]*2]
-    for i in range(diff):
-        data.extend(padding)
-    return data
-
-
+    max_seq = find_max_list(test_data[longest_sample_index])
 
 for i in range(len(training_data)):
     training_data[i] = pad_sample_len(training_data[i], longest_sample)
@@ -223,8 +250,6 @@ for i in range(len(training_data)):
 for i in range(len(test_data)):
     test_data[i] = pad_sample_len(test_data[i], longest_sample)
     test_data[i] = pad_seq_len(test_data[i],max_seq)
-
-
 
 # Convert data and labels into numpy arrays 
 train_labels = np.array(train_labels)
@@ -240,7 +265,6 @@ validation_data, test_data = test_data[:split_id], test_data[split_id:]
 val_labels, test_labels = test_labels[:split_id], test_labels[split_id:]
 
 # Create tensorDatasets for training, validation and testing 
-
 training_data = TensorDataset(torch.from_numpy(training_data), torch.from_numpy(train_labels))
 val_data = TensorDataset(torch.from_numpy(validation_data), torch.from_numpy(val_labels))
 test_data = TensorDataset(torch.from_numpy(test_data), torch.from_numpy(test_labels))
@@ -249,21 +273,20 @@ print(len(training_data))
 print(len(val_data))
 print(len(test_data))
 
-# could chose to use shuffle here, and previously written logic for it 
-batch_size = 2
+# Could chose to use shuffle here, and previously written logic for it 
+batch_size = 5
 train_loader = DataLoader(training_data, shuffle=False,  batch_size=batch_size)
 val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
 test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
 
-
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
-# Hardcoded for my personal architecture 
-device = torch.device("cpu")
+# Hardcoded for my personal archatecture 
 # If we have a GPU available, we'll set our device to GPU. We'll use this device variable later in our code.
 if is_cuda:
-    print('gpu')
+    print('cuda')
     # device = torch.device("cuda")
+    device = torch.device("cpu")
 else:
     print('cpu')
     device = torch.device("cpu")
@@ -295,7 +318,7 @@ class SentimentNet(nn.Module):
         self.lstm = nn.LSTM(embedding_dim*embedding_dim, hidden_dim, n_layers, dropout=drop_prob, batch_first=True)
         # During training, randomly zeroes some of the elements of the input tensor with probability p using samples from a Bernoulli distribution
         self.dropout = nn.Dropout(drop_prob)
-        # Applies a linear transformation to the incoming data with inputsize hidden_dim (512), outputsize (2) 
+        # Applies a linear transforma2,000 2 B + 2,000 2 V -> 50% accuracy tion to the incoming data with inputsize hidden_dim (512), outputsize (2) 
         self.fc = nn.Linear(hidden_dim, output_size)
         # Applies the element-wise function sigmoid 
         self.sigmoid = nn.Sigmoid()
@@ -306,6 +329,7 @@ class SentimentNet(nn.Module):
     def forward(self, x, hidden):
         # print('This is sapmle: ', x )
         batch_size = x.size(0)
+
         # print('batch_size is set to : ', batch_size)
         
         # Transform to unlimited precision 
@@ -313,16 +337,18 @@ class SentimentNet(nn.Module):
         # print('this is the x dims: ', len(x), len(x[0]), len(x[0][0]))
         embeds = self.embedding(x)
         # After this embedding, we have a dim of : (batch_size, sample_len, line, embedding_dim)(2, 409, 11,11)
-        # print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]), embeds[0][100][1][1])
+        # print('this is the embeds dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), len(embeds[0][0][0]), embeds[0][0][0][0])
 
         embeds = torch.reshape(embeds, (batch_size, longest_sample, embedding_dim*embedding_dim))
-        # print('this is the changed dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), embeds[0][100][12])
+        # print('this is the changed dims: ', len(embeds), len(embeds[0]), len(embeds[0][0]), embeds[0][0][0])
+        # print('this is the final dim: ', embeds[0][0])
         
         # print('this is the hidden:', len(hidden), len(hidden[0]), len(hidden[0][0]))
         lstm_out, hidden = self.lstm(embeds, hidden)
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
         
-        out = self.dropout(lstm_out)  
+        out = self.dropout(lstm_out) 
+        # out = self.lstm(lstm_out) 
         out = self.fc(out)
         out = self.sigmoid(out)
         
@@ -333,6 +359,8 @@ class SentimentNet(nn.Module):
 
    # Problem here defining the batch size, as 'batch_size' really is the number of lines?  
     def init_hidden(self, batch_size):
+        # print('in init: ', batch_size)
+
         weight = next(self.parameters()).data
         hidden = (weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(device),
                       weight.new(self.n_layers, batch_size , self.hidden_dim).zero_().to(device))
@@ -342,7 +370,7 @@ class SentimentNet(nn.Module):
 vocab_size = len(word2idx) + 1
 print('vocab size ', vocab_size)
 output_size = 1
-embedding_dim = 11  
+embedding_dim = max_seq
 hidden_dim = 512
 n_layers = 2
 model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
@@ -352,41 +380,65 @@ lr=0.005
 criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-epochs = 2
-counter = 0
-print_every = 1
+epochs = 3
 clip = 5
 valid_loss_min = np.Inf
 
 model.train()
 
-# Se each sample is in this 
-'''
-for i, (images, labels) in enumerate(tSæravtale for Spesialstyrker i Forsvaretrain_loader):
-    print(images[0][0])
-    print(len(images[0]))
-'''
+# variables introduced : 
+train_steps = []
+train_ccr = []
+train_cost = []   # Same as training loss, but over more samples 
 
+devel_steps = []
+devel_ccr = []
+
+num_correct_since_last_check = 0
+train_progress_conf = 5
+validation_progress_conf = 5
+step = 0
 
 # Trainloader dimensions: (8,2,409,11)
 for i in range(epochs):
-    h = model.init_hidden(batch_size)    
+    h = model.init_hidden(batch_size) 
     # print('in epoch: ', i)
     for inputs, labels in train_loader:
-        # print('in inputs, labels')
-        counter += 1
+        step += 1
+        num_correct_train = 0
         h = tuple([e.data for e in h])
         # print('this is the len of an input: ', len(inputs))
         inputs, labels = inputs.to(device), labels.to(device)
+        # print('this was the labels: ', labels)
         model.zero_grad()
         output, h = model(inputs, h)
-        # print('this is ouput:', output, len(output))
+      #  print('this is ouput:', output, len(output))
+        pred = torch.round(output.squeeze()) #rounds the output to 0/1
+        # print('this is the prediction:', pred)
+        correct_tensor = pred.eq(labels.float().view_as(pred))
+        num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
+        num_correct_since_last_check += num_correct
         loss = criterion(output.squeeze(), labels.float())
+        # train_progress.append(loss.item())
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), clip)
         optimizer.step()
         
-        if counter%print_every == 0:
+        # log progress so far and add it to the print list 
+        if step%train_progress_conf == 0:
+            ccr = num_correct / batch_size
+            running_ccr = (num_correct_since_last_check / train_progress_conf / batch_size)
+            # print('CCR: {} Running CCR {}'.format(ccr, running_ccr))
+            # print('Number of predictions correct so far: {} / {} (correct / step)'.format(num_correct_since_last_check, train_progress_conf*batch_size)) 
+            num_correct_since_last_check = 0
+            train_steps.append(step)
+            train_ccr.append(running_ccr)
+            train_cost.append(loss.item())
+        
+        if step%validation_progress_conf == 0:
+            valid_counter = 0
+            num_validated = 0
+            num_correct_validation = 0
             val_h = model.init_hidden(batch_size)
             val_losses = []
             model.eval()
@@ -396,10 +448,18 @@ for i in range(epochs):
                 out, val_h = model(inp, val_h)
                 val_loss = criterion(out.squeeze(), lab.float())
                 val_losses.append(val_loss.item())
-                
+
+                valid_correct_tensor = pred.eq(labels.float().view_as(pred))
+                valid_num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
+                num_correct_validation += valid_num_correct
+                valid_counter += batch_size
+
+            devel_steps.append(step)
+            devel_ccr.append(num_correct_validation / valid_counter)
+            
             model.train()
             print("Epoch: {}/{}...".format(i+1, epochs),
-                  "Step: {}...".format(counter),
+                  "Step: {}...".format(step),
                   "Loss: {:.6f}...".format(loss.item()),
                   "Val Loss: {:.6f}".format(np.mean(val_losses)))
             if np.mean(val_losses) <= valid_loss_min:
@@ -408,20 +468,25 @@ for i in range(epochs):
                 valid_loss_min = np.mean(val_losses)
 
 
+
+
 #Loading the best model
 model.load_state_dict(torch.load('./state_dict.pt'))
 test_losses = []
 num_correct = 0
 h = model.init_hidden(batch_size)
+print('\n\n EVALUATION \n\n')
 
 model.eval()
 for inputs, labels in test_loader:
     h = tuple([each.data for each in h])
     inputs, labels = inputs.to(device), labels.to(device)
+    # print('These are the labels: ', labels)
     output, h = model(inputs, h)
     test_loss = criterion(output.squeeze(), labels.float())
     test_losses.append(test_loss.item())
     pred = torch.round(output.squeeze()) #rounds the output to 0/1
+    # print('These are the predictions :', pred)
     correct_tensor = pred.eq(labels.float().view_as(pred))
     correct = np.squeeze(correct_tensor.cpu().numpy())
     num_correct += np.sum(correct)
@@ -429,3 +494,25 @@ for inputs, labels in test_loader:
 print("Test loss: {:.3f}".format(np.mean(test_losses)))
 test_acc = num_correct/len(test_loader.dataset)
 print("Test accuracy: {:.3f}%".format(test_acc*100))
+
+train_progress = {'steps': train_steps, 'ccr': train_ccr, 'cost': train_cost}
+devel_progress = {'steps': devel_steps, 'ccr': devel_ccr}
+
+plot_progress(train_progress, devel_progress, 'plot')
+sys.exit()
+
+
+'''
+plt.plot(train_progress)
+plt.ylabel('Training loss')
+plt.xlabel('Step')
+plt.savefig('training_loss.svg', format='svg', dpi=1200)
+plt.show()
+
+
+plt.plot(correct_predictions)
+plt.ylabel('Training acc')
+plt.xlabel('Step')
+plt.savefig('training_acc.svg', format='svg', dpi=1200)
+plt.show()
+'''
