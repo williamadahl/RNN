@@ -482,8 +482,8 @@ model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layer
 print(model)
 
 conf_bs = [5, 10, 20]
-conf_epoch = [1,2,3]
-conf_lr = [0.005, 0.01, 0.02]
+conf_epoch = [1,2,4]
+conf_lr = [0.005, 0.0075 ,0.01]
 for x in range(len(conf_bs)):
     deep_learning(conf_bs[x], conf_epoch[x], conf_lr[x], x)
 
