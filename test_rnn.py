@@ -11,6 +11,135 @@ import sys
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 
+
+# Function for doing deep learning
+def deep_learning(batch_size, epochs, learning_rate, name): 
+
+    batch_size = batch_size
+    epochs = epochs
+    lr = learning_rate 
+    
+    # create loaders 
+    train_loader = DataLoader(training_data, shuffle=False,  batch_size=batch_size)
+    val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
+    test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
+
+  
+    criterion = nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # set storage 
+    clip = 5
+    valid_loss_min = np.Inf
+    model.train()
+
+    train_steps = []
+    train_ccr = []
+    train_cost = []   # Same as training loss, but over more samples 
+    devel_steps = []
+    devel_ccr = []
+
+    num_correct_since_last_check = 0
+    train_progress_conf = 5
+    validation_progress_conf = 5
+    step = 0
+
+
+    for i in range(epochs):
+        h = model.init_hidden(batch_size) 
+        for inputs, labels in train_loader:
+            step += 1
+            num_correct_train = 0
+            h = tuple([e.data for e in h])
+            inputs, labels = inputs.to(device), labels.to(device)
+            model.zero_grad()
+            output, h = model(inputs, h)
+            pred = torch.round(output.squeeze()) #rounds the output to 0/1
+            correct_tensor = pred.eq(labels.float().view_as(pred))
+            num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
+            num_correct_since_last_check += num_correct
+            loss = criterion(output.squeeze(), labels.float())
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), clip)
+            optimizer.step()
+            
+            # log progress so far and add it to the print list 
+            if step%train_progress_conf == 0:
+                ccr = num_correct / batch_size
+                running_ccr = (num_correct_since_last_check / train_progress_conf / batch_size)
+                # print('CCR: {} Running CCR {}'.format(ccr, running_ccr))
+                # print('Number of predictions correct so far: {} / {} (correct / step)'.format(num_correct_since_last_check, train_progress_conf*batch_size)) 
+                num_correct_since_last_check = 0
+                train_steps.append(step)
+                train_ccr.append(running_ccr)
+                train_cost.append(loss.item())
+                
+            # log validation progress         
+            if step%validation_progress_conf == 0:
+                valid_counter = 0
+                num_validated = 0
+                num_correct_validation = 0
+                val_h = model.init_hidden(batch_size)
+                val_losses = []
+                model.eval()
+                for inp, lab in val_loader:
+                    val_h = tuple([each.data for each in val_h])
+                    inp, lab = inp.to(device), lab.to(device)
+                    out, val_h = model(inp, val_h)
+                    val_loss = criterion(out.squeeze(), lab.float())
+                    val_losses.append(val_loss.item())
+
+                    valid_correct_tensor = pred.eq(labels.float().view_as(pred))
+                    valid_num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
+                    num_correct_validation += valid_num_correct
+                    valid_counter += batch_size
+
+                devel_steps.append(step)
+                devel_ccr.append(num_correct_validation / valid_counter)
+                
+                model.train()
+                print("Epoch: {}/{}...".format(i+1, epochs),
+                    "Step: {}...".format(step),
+                    "Loss: {:.6f}...".format(loss.item()),
+                    "Val Loss: {:.6f}".format(np.mean(val_losses)))
+                if np.mean(val_losses) <= valid_loss_min:
+                    torch.save(model.state_dict(), './state_dict.pt')
+                    print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(valid_loss_min,np.mean(val_losses)))
+                    valid_loss_min = np.mean(val_losses)
+
+
+
+
+    #Loading the best model
+    model.load_state_dict(torch.load('./state_dict.pt'))
+    test_losses = []
+    num_correct = 0
+    h = model.init_hidden(batch_size)
+    print('\n\n EVALUATION \n\n')
+    print('Params: batch_size = {} epochs = {} learning_rate = {}'.format(batch_size, epochs, learning_rate))
+    model.eval()
+    for inputs, labels in test_loader:
+        h = tuple([each.data for each in h])
+        inputs, labels = inputs.to(device), labels.to(device)
+        output, h = model(inputs, h)
+        test_loss = criterion(output.squeeze(), labels.float())
+        test_losses.append(test_loss.item())
+        pred = torch.round(output.squeeze()) #rounds the output to 0/1
+        correct_tensor = pred.eq(labels.float().view_as(pred))
+        correct = np.squeeze(correct_tensor.cpu().numpy())
+        num_correct += np.sum(correct)
+            
+    print("Test loss: {:.3f}".format(np.mean(test_losses)))
+    test_acc = num_correct/len(test_loader.dataset)
+    print("Test accuracy: {:.3f}%".format(test_acc*100))
+    train_progress = {'steps': train_steps, 'ccr': train_ccr, 'cost': train_cost}
+    devel_progress = {'steps': devel_steps, 'ccr': devel_ccr}
+
+    plot_progress(train_progress, devel_progress, 'plot'+str(name))
+
+
+
+
 # Function for plotting progress 
 def plot_progress(train_progress, devel_progress, out_filename=None):
     """Plot a chart of the training progress"""
@@ -37,7 +166,7 @@ def plot_progress(train_progress, devel_progress, out_filename=None):
     if out_filename is not None:
         plt.savefig(out_filename)
 
-    plt.show()
+    # plt.show()
 
 
 # Function for finding the longest code line in training data
@@ -264,11 +393,7 @@ print(len(training_data))
 print(len(val_data))
 print(len(test_data))
 
-# Could chose to use shuffle here, and previously written logic for it 
-batch_size = 5
-train_loader = DataLoader(training_data, shuffle=False,  batch_size=batch_size)
-val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
-test_loader = DataLoader(test_data, shuffle=False, batch_size=batch_size)
+
 
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
@@ -341,6 +466,12 @@ class SentimentNet(nn.Module):
         return hidden
 
 
+
+ # config 
+lr=0.005
+batch_size = 5
+epochs = 3
+  # set up model 
 vocab_size = len(word2idx) + 1
 print('vocab size ', vocab_size)
 output_size = 1
@@ -350,114 +481,11 @@ n_layers = 2
 model = SentimentNet(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
 print(model)
 
-lr=0.005
-criterion = nn.BCELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-epochs = 3
-clip = 5
-valid_loss_min = np.Inf
-model.train()
-
-train_steps = []
-train_ccr = []
-train_cost = []   # Same as training loss, but over more samples 
-devel_steps = []
-devel_ccr = []
-
-num_correct_since_last_check = 0
-train_progress_conf = 5
-validation_progress_conf = 5
-step = 0
-
-for i in range(epochs):
-    h = model.init_hidden(batch_size) 
-    for inputs, labels in train_loader:
-        step += 1
-        num_correct_train = 0
-        h = tuple([e.data for e in h])
-        inputs, labels = inputs.to(device), labels.to(device)
-        model.zero_grad()
-        output, h = model(inputs, h)
-        pred = torch.round(output.squeeze()) #rounds the output to 0/1
-        correct_tensor = pred.eq(labels.float().view_as(pred))
-        num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
-        num_correct_since_last_check += num_correct
-        loss = criterion(output.squeeze(), labels.float())
-        loss.backward()
-        nn.utils.clip_grad_norm_(model.parameters(), clip)
-        optimizer.step()
-        
-        # log progress so far and add it to the print list 
-        if step%train_progress_conf == 0:
-            ccr = num_correct / batch_size
-            running_ccr = (num_correct_since_last_check / train_progress_conf / batch_size)
-            # print('CCR: {} Running CCR {}'.format(ccr, running_ccr))
-            # print('Number of predictions correct so far: {} / {} (correct / step)'.format(num_correct_since_last_check, train_progress_conf*batch_size)) 
-            num_correct_since_last_check = 0
-            train_steps.append(step)
-            train_ccr.append(running_ccr)
-            train_cost.append(loss.item())
-            
-        # log validation progress         
-        if step%validation_progress_conf == 0:
-            valid_counter = 0
-            num_validated = 0
-            num_correct_validation = 0
-            val_h = model.init_hidden(batch_size)
-            val_losses = []
-            model.eval()
-            for inp, lab in val_loader:
-                val_h = tuple([each.data for each in val_h])
-                inp, lab = inp.to(device), lab.to(device)
-                out, val_h = model(inp, val_h)
-                val_loss = criterion(out.squeeze(), lab.float())
-                val_losses.append(val_loss.item())
-
-                valid_correct_tensor = pred.eq(labels.float().view_as(pred))
-                valid_num_correct = np.sum(np.squeeze(correct_tensor.cpu().numpy()))
-                num_correct_validation += valid_num_correct
-                valid_counter += batch_size
-
-            devel_steps.append(step)
-            devel_ccr.append(num_correct_validation / valid_counter)
-            
-            model.train()
-            print("Epoch: {}/{}...".format(i+1, epochs),
-                  "Step: {}...".format(step),
-                  "Loss: {:.6f}...".format(loss.item()),
-                  "Val Loss: {:.6f}".format(np.mean(val_losses)))
-            if np.mean(val_losses) <= valid_loss_min:
-                torch.save(model.state_dict(), './state_dict.pt')
-                print('Validation loss decreased ({:.6f} --> {:.6f}).  Saving model ...'.format(valid_loss_min,np.mean(val_losses)))
-                valid_loss_min = np.mean(val_losses)
+conf_bs = [5, 10, 20]
+conf_epoch = [1,2,3]
+conf_lr = [0.005, 0.01, 0.02]
+for x in range(len(conf_bs)):
+    deep_learning(conf_bs[x], conf_epoch[x], conf_lr[x], x)
 
 
 
-
-#Loading the best model
-model.load_state_dict(torch.load('./state_dict.pt'))
-test_losses = []
-num_correct = 0
-h = model.init_hidden(batch_size)
-print('\n\n EVALUATION \n\n')
-
-model.eval()
-for inputs, labels in test_loader:
-    h = tuple([each.data for each in h])
-    inputs, labels = inputs.to(device), labels.to(device)
-    output, h = model(inputs, h)
-    test_loss = criterion(output.squeeze(), labels.float())
-    test_losses.append(test_loss.item())
-    pred = torch.round(output.squeeze()) #rounds the output to 0/1
-    correct_tensor = pred.eq(labels.float().view_as(pred))
-    correct = np.squeeze(correct_tensor.cpu().numpy())
-    num_correct += np.sum(correct)
-        
-print("Test loss: {:.3f}".format(np.mean(test_losses)))
-test_acc = num_correct/len(test_loader.dataset)
-print("Test accuracy: {:.3f}%".format(test_acc*100))
-train_progress = {'steps': train_steps, 'ccr': train_ccr, 'cost': train_cost}
-devel_progress = {'steps': devel_steps, 'ccr': devel_ccr}
-
-plot_progress(train_progress, devel_progress, 'plot')
